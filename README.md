@@ -8,7 +8,7 @@ This pipeline is designed to support repeatable Reddit data ingestion for analyt
 
 ## Architecture
 
-![Reddit Data Engineering Architecture](assets/RedditDataEngineering.png)
+![Reddit Data Engineering Architecture](assets/reddit_pipeline_architecture.svg)
 
 The pipeline follows a simple batch processing flow:
 
@@ -32,7 +32,7 @@ The pipeline follows a simple batch processing flow:
 ```text
 .
 |-- assets/
-|   `-- RedditDataEngineering.png
+|   `-- reddit_pipeline_architecture.svg
 |-- config/
 |   `-- config.conf.example
 |-- dags/
