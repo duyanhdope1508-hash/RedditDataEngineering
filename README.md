@@ -1,29 +1,38 @@
-# Personal Reddit Analytics Pipeline
+# Reddit Data Engineering Pipeline
 
-Day la phien ban tuy bien cua du an Reddit data pipeline. Muc tieu cua du an la thu thap bai viet tu Reddit, chuan hoa du lieu thanh CSV, va dua raw data len Amazon S3 de tiep tuc phan tich bang cac dich vu AWS nhu Glue, Athena hoac Redshift.
+A production-oriented data pipeline for collecting Reddit post data, transforming it into an analytics-ready CSV dataset, and storing the output in Amazon S3. The project uses Apache Airflow for orchestration, Python for extraction and transformation, and Docker Compose for local development.
 
-## Diem khac so voi ban goc
+## Overview
 
-- Doi ten DAG thanh `personal_reddit_analytics_pipeline`.
-- Dua subreddit, time filter, limit va user agent vao file config thay vi hard-code trong DAG.
-- Bo sung cac cot Reddit huu ich: `upvote_ratio`, `subreddit`, `permalink`.
-- Tao thu muc output tu dong truoc khi ghi CSV.
-- Xu ly du lieu rong va cot `edited` on dinh hon.
-- Viet lai README theo huong ca nhan de de thuyet trinh/bao cao.
+This pipeline is designed to support repeatable Reddit data ingestion for analytics and downstream data warehouse workflows. It extracts posts from a configurable subreddit, standardizes the selected fields, writes the result to local storage, and uploads the generated file to an S3 bucket.
 
-## Kien truc
+## Architecture
 
-1. Reddit API cung cap du lieu bai viet.
-2. Airflow dieu phoi workflow ETL hang ngay.
-3. Python/Pandas lam sach va chuan hoa du lieu.
-4. Local CSV luu ban raw da chuan hoa.
-5. Amazon S3 luu tru file trong folder `raw/`.
+![Reddit Data Engineering Architecture](assets/RedditDataEngineering.png)
 
-## Cau truc thu muc
+The pipeline follows a simple batch processing flow:
+
+1. Airflow schedules and runs the workflow.
+2. The Reddit API provides post data for the configured subreddit.
+3. Python transforms the raw API response into a structured dataset.
+4. The transformed CSV file is written to the local Airflow data volume.
+5. The output file is uploaded to Amazon S3 under the `raw/` prefix.
+
+## Features
+
+- Configurable subreddit, time filter, post limit, and Reddit user agent.
+- Daily Airflow DAG for automated batch ingestion.
+- Structured Reddit post extraction with fields such as score, comments, author, URL, upvote ratio, and permalink.
+- Pandas-based transformation for clean CSV output.
+- S3 upload step with automatic bucket creation when needed.
+- Docker Compose environment with Airflow, PostgreSQL, Redis, scheduler, webserver, and worker services.
+
+## Project Structure
 
 ```text
 .
 |-- assets/
+|   `-- RedditDataEngineering.png
 |-- config/
 |   `-- config.conf.example
 |-- dags/
@@ -38,36 +47,29 @@ Day la phien ban tuy bien cua du an Reddit data pipeline. Muc tieu cua du an la 
 |   `-- reddit_pipeline.py
 |-- utils/
 |   `-- constants.py
+|-- airflow.env
 |-- docker-compose.yml
 |-- Dockerfile
+|-- README.md
 `-- requirements.txt
 ```
 
-## Chuan bi
+## Prerequisites
 
-- Docker va Docker Compose.
-- Python 3.9+ neu muon chay local.
-- Reddit API credentials.
-- AWS access key co quyen tao bucket va upload object len S3.
+- Docker and Docker Compose
+- Python 3.9 or later
+- Reddit API credentials
+- AWS credentials with permission to create and write to an S3 bucket
 
-## Cau hinh
+## Configuration
 
-Tao file config rieng tu file mau:
+Create a local configuration file from the provided template:
 
 ```bash
 cp config/config.conf.example config/config.conf
 ```
 
-Sau do dien cac gia tri:
-
-- `reddit_client_id`
-- `reddit_secret_key`
-- `aws_access_key_id`
-- `aws_secret_access_key`
-- `aws_region`
-- `aws_bucket_name`
-
-Co the doi phan `[reddit]` de chon subreddit khac:
+Update the following sections in `config/config.conf`:
 
 ```ini
 [reddit]
@@ -75,54 +77,90 @@ subreddit = dataengineering
 time_filter = day
 post_limit = 100
 user_agent = PersonalRedditAnalytics/1.0
+
+[api_keys]
+reddit_secret_key = <your-reddit-secret-key>
+reddit_client_id = <your-reddit-client-id>
+
+[aws]
+aws_access_key_id = <your-aws-access-key-id>
+aws_secret_access_key = <your-aws-secret-access-key>
+aws_region = <your-aws-region>
+aws_bucket_name = <your-s3-bucket-name>
 ```
 
-## Chay voi Docker
+The local `config.conf` file is ignored by Git to prevent secrets from being committed.
 
-Khoi tao database va user Airflow:
+## Running Locally
+
+Initialize Airflow metadata and create the default admin user:
 
 ```bash
 docker-compose up airflow-init
 ```
 
-Chay cac service:
+Start the full pipeline environment:
 
 ```bash
 docker-compose up -d
 ```
 
-Mo Airflow UI tai:
+Open the Airflow web UI:
 
 ```text
 http://localhost:8080
 ```
 
-Tai khoan mac dinh:
+Default local credentials:
 
 ```text
 username: admin
 password: admin
 ```
 
-Bat DAG `personal_reddit_analytics_pipeline` de chay pipeline.
+Enable and run the DAG:
 
-## Du lieu dau ra
+```text
+personal_reddit_analytics_pipeline
+```
 
-File CSV se duoc tao trong:
+## Output
+
+The extraction task writes a CSV file to:
 
 ```text
 data/output/reddit_<YYYYMMDD>.csv
 ```
 
-Sau do file duoc upload len S3:
+The upload task stores the same file in S3:
 
 ```text
 s3://<bucket-name>/raw/reddit_<YYYYMMDD>.csv
 ```
 
-## Huong phat trien tiep
+## Data Fields
 
-- Them Glue crawler de catalog du lieu S3.
-- Tao bang Athena tren folder `raw/`.
-- Them job transform sang parquet trong folder `processed/`.
-- Nap du lieu da transform vao Redshift.
+The pipeline extracts and stores the following Reddit post fields:
+
+- `id`
+- `title`
+- `score`
+- `num_comments`
+- `author`
+- `created_utc`
+- `url`
+- `upvote_ratio`
+- `subreddit`
+- `permalink`
+- `over_18`
+- `edited`
+- `spoiler`
+- `stickied`
+
+## Roadmap
+
+- Add automated validation for the generated CSV files.
+- Convert raw CSV outputs to partitioned Parquet datasets.
+- Register S3 data with AWS Glue Data Catalog.
+- Add Athena queries for exploratory analytics.
+- Load curated datasets into Amazon Redshift.
